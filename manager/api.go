@@ -2,6 +2,8 @@ package manager
 
 import (
 	"crypto/rand"
+	"database/sql"
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/gophergala/docker-bastion/config"
 	"github.com/martini-contrib/render"
 	"github.com/martini-contrib/sessions"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const API_PREFIX = "/api"
@@ -88,7 +91,7 @@ func (mgr *Manager) genSessionKey() ([]byte, error) {
 
 var AuthWhiteList = map[string][]string{
 	"GET":    {"/_ping"},
-	"POST":   {},
+	"POST":   {"/login"},
 	"DELETE": {},
 }
 
@@ -98,11 +101,11 @@ func (mgr *Manager) authRequired(r *http.Request) bool {
 		return false
 	}
 	for _, path := range list {
-		if r.URL.Path == path {
-			return true
+		if r.URL.Path == API_PREFIX+path {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 func (mgr *Manager) registerRoutes() {
@@ -110,5 +113,44 @@ func (mgr *Manager) registerRoutes() {
 		r.Get("/_ping", func(w http.ResponseWriter) {
 			w.Write([]byte{'O', 'K'})
 		})
+		r.Post("/login", mgr.Login)
 	})
+}
+
+func (mgr *Manager) showError(err error, w http.ResponseWriter) {
+	status := 500
+	switch err {
+	case sql.ErrNoRows:
+		status = 404
+	case bcrypt.ErrMismatchedHashAndPassword:
+		status = 400
+	}
+	w.WriteHeader(status)
+}
+
+func (mgr *Manager) Login(w http.ResponseWriter, r *http.Request, rnd render.Render, ss sessions.Session) {
+	req := map[string]string{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil || len(req["name"]) < 3 || len(req["password"]) < 3 {
+		w.WriteHeader(400)
+		return
+	}
+
+	var (
+		password string
+		uid      int
+	)
+	stmt, err := mgr.db.Prepare("select id, password from admins where name = ?")
+	if err == nil {
+		err = stmt.QueryRow(req["name"]).Scan(&uid, &password)
+	}
+	if err == nil {
+		err = bcrypt.CompareHashAndPassword([]byte(password), []byte(req["password"]))
+	}
+	if err != nil {
+		mgr.showError(err, w)
+		return
+	}
+	ss.Set("uid", uid)
+	w.WriteHeader(204)
 }
