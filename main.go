@@ -48,7 +48,7 @@ func run(c *cli.Context) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	mgr, err := manager.New(c.String("manage-addr"), errs)
+	mgr, err := manager.New(c.String("manage-addr"), db, errs)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -75,12 +75,20 @@ func initDB() (*sql.DB, error) {
 			password character(80),
 			created_at datetime default current_timestamp
 		)`,
+		`create index if not exists idx_name on users (name)`,
 		`create table if not exists containers (
 			name character(100),
 			user_id integer,
 			created_at datetime default current_timestamp
 		)`,
 		`create index if not exists idx_name_uid on containers (name, user_id)`,
+		`create table if not exists admins (
+			id integer primary key,
+			name character(100) unique,
+			password character(80),
+			created_at datetime default current_timestamp
+		)`,
+		`create index if not exists idx_name on admins (name)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := db.Exec(stmt); err != nil {

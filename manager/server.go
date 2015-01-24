@@ -1,23 +1,34 @@
 package manager
 
 import (
-	"net/http"
+	"database/sql"
+
+	"github.com/go-martini/martini"
 )
 
 type Manager struct {
 	addr  string
 	errch chan<- error
+	db    *sql.DB
+	m     *martini.ClassicMartini
 }
 
-func New(addr string, ch chan<- error) (*Manager, error) {
-	return &Manager{
+func New(addr string, db *sql.DB, ch chan<- error) (*Manager, error) {
+	mgr := &Manager{
 		addr:  addr,
 		errch: ch,
-	}, nil
+		db:    db,
+	}
+	err := mgr.InitMartini()
+	if err != nil {
+		return nil, err
+	}
+	return mgr, nil
 }
 
 func (mgr *Manager) Start() {
 	go func() {
-		mgr.errch <- http.ListenAndServe(mgr.addr, nil)
+		mgr.m.RunOnAddr(mgr.addr)
+		mgr.errch <- nil
 	}()
 }
