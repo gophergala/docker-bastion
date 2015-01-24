@@ -17,5 +17,7 @@ func New(addr string, ch chan<- error) (*Manager, error) {
 }
 
 func (mgr *Manager) Start() {
-	http.ListenAndServe(mgr.addr, nil)
+	go func() {
+		mgr.errch <- http.ListenAndServe(mgr.addr, nil)
+	}()
 }
