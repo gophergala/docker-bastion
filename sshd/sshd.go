@@ -6,10 +6,12 @@ package sshd
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
 	"io/ioutil"
 	"net"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -18,6 +20,12 @@ import (
 	"github.com/kr/pty"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/ssh"
+)
+
+var (
+	ErrInvalidContainerName = errors.New("login name must has the format of USERNAME.CONTAINER_NAME, where CONTAINER_NAME is the container that you want to login")
+	ErrInvalidPassword      = errors.New("username or password is incorrect")
+	ErrAccessDenied         = errors.New("you don't have the privileges to access the container")
 )
 
 func (sshd *SSHD) initServerConfig() error {
@@ -37,44 +45,75 @@ func (sshd *SSHD) initServerConfig() error {
 }
 
 func (sshd *SSHD) passwordCallback(meta ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-	user := meta.User()
+	user := sshd.getUsername(meta.User())
+	container := sshd.getContainerName(meta.User())
+	if len(container) == 0 {
+		return nil, ErrInvalidContainerName
+	}
+
 	stmt, err := sshd.db.Prepare("select id, password from users where name = ?")
 	if err != nil {
 		return nil, err
 	}
-	defer stmt.Close()
 
 	var (
-		savedPass string
-		uid       int
+		savedPass    string
+		uid          int
+		hasContainer int
 	)
 	err = stmt.QueryRow(user).Scan(&uid, &savedPass)
+	stmt.Close()
 	if err != nil {
-		return nil, err
+		log.Error("Scan: ", err)
+		return nil, ErrInvalidPassword
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(savedPass), pass)
 	if err != nil {
-		return nil, err
+		return nil, ErrInvalidPassword
 	}
 
-	// TODO: username and container mapping
-	// TODO: privileges checking
+	stmt, err = sshd.db.Prepare("select 1 from containers where user_id = ? and name = ?")
+	if err != nil {
+		return nil, err
+	}
+	stmt.QueryRow(uid, container).Scan(&hasContainer)
+	stmt.Close()
+	if hasContainer != 1 {
+		return nil, ErrAccessDenied
+	}
+
 	return nil, nil
+}
+
+// The username of the SSH connection containers 2 fields separated by a dot.
+// The first field is the user's account name,
+// the second field is the container name to login.
+func (sshd *SSHD) getUsername(in string) string {
+	segs := strings.SplitN(in, ".", 2)
+	return segs[0]
+}
+func (sshd *SSHD) getContainerName(in string) string {
+	segs := strings.SplitN(in, ".", 2)
+	if len(segs) != 2 {
+		return ""
+	}
+	return segs[1]
 }
 
 func (sshd *SSHD) serve(conn net.Conn) {
 	sshConn, chans, reqs, err := ssh.NewServerConn(conn, sshd.sshconfig)
 	if err != nil {
-		log.Error(err)
+		log.Error("ssh.NewServerConn: ", err)
 		conn.Write([]byte(err.Error()))
 		conn.Close()
 		return
 	}
+	container := sshd.getContainerName(sshConn.User())
 
 	log.Infof("new connection %s/%s", sshConn.RemoteAddr(), string(sshConn.ClientVersion()))
 	go sshd.handleRequests(reqs)
-	go sshd.handleChannels(chans)
+	go sshd.handleChannels(chans, container)
 }
 
 func (sshd *SSHD) handleRequests(requests <-chan *ssh.Request) {
@@ -83,7 +122,7 @@ func (sshd *SSHD) handleRequests(requests <-chan *ssh.Request) {
 	}
 }
 
-func (sshd *SSHD) handleChannels(chans <-chan ssh.NewChannel) {
+func (sshd *SSHD) handleChannels(chans <-chan ssh.NewChannel, container string) {
 	for ch := range chans {
 		if ch.ChannelType() != "session" {
 			ch.Reject(ssh.UnknownChannelType, "unknown channel type")
@@ -94,12 +133,12 @@ func (sshd *SSHD) handleChannels(chans <-chan ssh.NewChannel) {
 			log.Error(err)
 			continue
 		}
-		sshd.handleChannel(channel, requests)
+		sshd.handleChannel(channel, requests, container)
 	}
 }
 
-func (sshd *SSHD) handleChannel(channel ssh.Channel, requests <-chan *ssh.Request) {
-	cmd := exec.Command("docker", "exec", "-i", "-t", "dev-vm", "/bin/bash")
+func (sshd *SSHD) handleChannel(channel ssh.Channel, requests <-chan *ssh.Request, container string) {
+	cmd := exec.Command("docker", "exec", "-i", "-t", container, "/bin/bash")
 	closeChannel := func() {
 		channel.Close()
 		_, err := cmd.Process.Wait()

@@ -69,14 +69,23 @@ func initDB() (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	stmt := `create table if not exists users (
-		id integer primary key,
-		name character(100) unique,
-		password character(80),
-		created_at datetime default current_timestamp
-	)`
-	if _, err := db.Exec(stmt); err != nil {
-		return nil, err
+	stmts := []string{`create table if not exists users (
+			id integer primary key,
+			name character(100) unique,
+			password character(80),
+			created_at datetime default current_timestamp
+		)`,
+		`create table if not exists containers (
+			name character(100),
+			user_id integer,
+			created_at datetime default current_timestamp
+		)`,
+		`create index if not exists idx_name_uid on containers (name, user_id)`,
+	}
+	for _, stmt := range stmts {
+		if _, err := db.Exec(stmt); err != nil {
+			return nil, err
+		}
 	}
 	return db, nil
 }
