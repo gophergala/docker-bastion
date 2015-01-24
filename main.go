@@ -1,12 +1,15 @@
 package main
 
 import (
+	"database/sql"
 	"os"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/gophergala/docker-bastion/config"
 	"github.com/gophergala/docker-bastion/manager"
 	"github.com/gophergala/docker-bastion/sshd"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
@@ -37,7 +40,11 @@ func main() {
 
 func run(c *cli.Context) {
 	errs := make(chan error)
-	ssh, err := sshd.New(c.String("ssh-addr"), errs)
+	db, err := initDB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	ssh, err := sshd.New(c.String("ssh-addr"), db, errs)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -54,4 +61,22 @@ func run(c *cli.Context) {
 			log.Fatal(err)
 		}
 	}
+}
+
+func initDB() (*sql.DB, error) {
+	dbPath := config.DATA_DIR + "/meta.sqlite3"
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return nil, err
+	}
+	stmt := `create table if not exists users (
+		id integer primary key,
+		name character(100) unique,
+		password character(80),
+		created_at datetime default current_timestamp
+	)`
+	if _, err := db.Exec(stmt); err != nil {
+		return nil, err
+	}
+	return db, nil
 }
