@@ -2,15 +2,18 @@ package manager
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/go-martini/martini"
+	"github.com/mountkin/dockerclient"
 )
 
 type Manager struct {
-	addr  string
-	errch chan<- error
-	db    *sql.DB
-	m     *martini.ClassicMartini
+	addr   string
+	errch  chan<- error
+	db     *sql.DB
+	m      *martini.ClassicMartini
+	client dockerclient.Client
 }
 
 func New(addr string, db *sql.DB, ch chan<- error) (*Manager, error) {
@@ -20,6 +23,12 @@ func New(addr string, db *sql.DB, ch chan<- error) (*Manager, error) {
 		db:    db,
 	}
 	err := mgr.InitMartini()
+	if err != nil {
+		return nil, err
+	}
+
+	// connect to docker remote API
+	mgr.client, err = dockerclient.NewDockerClientTimeout("unix:///var/run/docker.sock", nil, 3*time.Second)
 	if err != nil {
 		return nil, err
 	}

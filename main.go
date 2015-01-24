@@ -77,11 +77,11 @@ func initDB() (*sql.DB, error) {
 		)`,
 		`create index if not exists idx_name on users (name)`,
 		`create table if not exists containers (
-			name character(100),
+			cid character(12),
 			user_id integer,
 			created_at datetime default current_timestamp
 		)`,
-		`create index if not exists idx_name_uid on containers (name, user_id)`,
+		`create unique index if not exists idx_cid_uid on containers (cid, user_id)`,
 		`create table if not exists admins (
 			id integer primary key,
 			name character(100) unique,

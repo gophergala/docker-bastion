@@ -46,8 +46,8 @@ func (sshd *SSHD) initServerConfig() error {
 
 func (sshd *SSHD) passwordCallback(meta ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 	user := sshd.getUsername(meta.User())
-	container := sshd.getContainerName(meta.User())
-	if len(container) == 0 {
+	container := sshd.getContainerId(meta.User())
+	if len(container) != 12 {
 		return nil, ErrInvalidContainerName
 	}
 
@@ -73,11 +73,11 @@ func (sshd *SSHD) passwordCallback(meta ssh.ConnMetadata, pass []byte) (*ssh.Per
 		return nil, ErrInvalidPassword
 	}
 
-	stmt, err = sshd.db.Prepare("select 1 from containers where user_id = ? and name = ?")
+	stmt, err = sshd.db.Prepare("select 1 from containers where user_id = ? and cid like ?")
 	if err != nil {
 		return nil, err
 	}
-	stmt.QueryRow(uid, container).Scan(&hasContainer)
+	stmt.QueryRow(uid, container+"%").Scan(&hasContainer)
 	stmt.Close()
 	if hasContainer != 1 {
 		return nil, ErrAccessDenied
@@ -88,12 +88,12 @@ func (sshd *SSHD) passwordCallback(meta ssh.ConnMetadata, pass []byte) (*ssh.Per
 
 // The username of the SSH connection containers 2 fields separated by a dot.
 // The first field is the user's account name,
-// the second field is the container name to login.
+// the second field is the first 12 characters of the container id to login.
 func (sshd *SSHD) getUsername(in string) string {
 	segs := strings.SplitN(in, ".", 2)
 	return segs[0]
 }
-func (sshd *SSHD) getContainerName(in string) string {
+func (sshd *SSHD) getContainerId(in string) string {
 	segs := strings.SplitN(in, ".", 2)
 	if len(segs) != 2 {
 		return ""
@@ -109,7 +109,7 @@ func (sshd *SSHD) serve(conn net.Conn) {
 		conn.Close()
 		return
 	}
-	container := sshd.getContainerName(sshConn.User())
+	container := sshd.getContainerId(sshConn.User())
 
 	log.Infof("new connection %s/%s", sshConn.RemoteAddr(), string(sshConn.ClientVersion()))
 	go sshd.handleRequests(reqs)
