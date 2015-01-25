@@ -245,9 +245,6 @@ func (mgr *Manager) Users(w http.ResponseWriter, rnd render.Render) {
 	for rows.Next() {
 		user := UserPriv{}
 		err = rows.Scan(&user.UserId, &user.Name, &user.CreatedAt, &user.PrivId, &user.Cid, &user.JoinedAt)
-		if err != nil {
-			continue
-		}
 		ret = append(ret, user)
 	}
 	rnd.JSON(200, ret)
@@ -366,7 +363,7 @@ func (mgr *Manager) DeleteContainer(w http.ResponseWriter, r *http.Request, para
 
 // GET /api/containers
 func (mgr *Manager) Containers(w http.ResponseWriter, rnd render.Render) {
-	containers, err := mgr.client.ListContainers(false, false, "")
+	containers, err := mgr.client.ListContainers(true, false, "")
 	if err != nil {
 		log.Error(err)
 		w.WriteHeader(500)

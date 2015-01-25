@@ -24,7 +24,7 @@
     <![endif]-->
   </head>
 
-  <body>
+  <body id="body">
 
     <nav class="navbar navbar-inverse navbar-fixed-top">
       <div class="container-fluid">
@@ -49,27 +49,18 @@
     <div class="container-fluid">
       <div class="row">
         <div class="col-sm-3 col-md-2 sidebar">
-          <ul class="nav nav-sidebar">
-            <li class="active"><a href="#">Containers<span class="sr-only">(current)</span></a></li>
-            <li><a href="#">Users</a></li>
+          <ul class="nav nav-sidebar" id="sidebar-nav">
+            <li class="active" id="nav-containers"><a href="/containers">Containers</a></li>
+            <li id="nav-users"><a href="/users">Users</a></li>
           </ul>
         </div>
         <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
           <h1 class="page-header" id="page-header">Containers</h1>
           <div class="table-responsive">
-            <table class="table table-striped">
+            <table class="table table-striped" id="main-table">
               <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Users</th>
-                  <th>Name</th>
-                  <th>Created At</th>
-                  <th>Image</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
               </thead>
-              <tbody id="containers">
+              <tbody>
               </tbody>
             </table>
           </div>

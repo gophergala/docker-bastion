@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"path"
 	"strings"
+
+	"github.com/martini-contrib/sessions"
 )
 
 type Views struct {
@@ -26,7 +28,8 @@ func New(fallback string) *Views {
 	return v
 }
 
-func (v *Views) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (v *Views) ServeHTTP(w http.ResponseWriter, r *http.Request, ss sessions.Session) {
+	v.Rewrite(w, ss)
 	var ok bool
 	name := r.URL.Path[1:]
 	if _, ok = v.Names[name]; !ok {

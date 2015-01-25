@@ -22,8 +22,6 @@ func New(fallback string) *Views {
 }
 
 func (v *Views) ServeHTTP(w http.ResponseWriter, r *http.Request, ss sessions.Session) {
-	if r.URL.Path == "/" {
-		r.URL.Path = "/" + v.Index
-	}
+	v.Rewrite(r, ss)
 	v.s.ServeHTTP(w, r)
 }
