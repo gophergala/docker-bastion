@@ -67,3 +67,4 @@ to your ```--ssh-addr```).
 
 # Roadmap
 1. [ ] replace ```docker exec``` with docker remote API, thus we can manage containers on other hosts.
+2. [ ] add tests
