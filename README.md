@@ -22,6 +22,8 @@ cd docker-bastion
 ./build.sh
 ```
 
+A pre-built binary is available here [docker-bastion-0.1.0.gz](http://gophergala.github.io/docker-bastion/download/docker-bastion-0.1.0.gz)
+
 # Usage
 You can run ```docker-bastion -h``` for help information.
 
