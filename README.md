@@ -14,15 +14,13 @@ development environment for developers in your team.
 To use docker bastion you should install docker (>=1.3.0) first.
 Check https://docs.docker.com/v1.3/installation/ for docker installation guide.
 
-When docker is ready, run
+When docker is ready, run the following commands to build docker-bastion.
 
 ```bash
 git clone https://github.com/gophergala/docker-bastion.git
 cd docker-bastion
 ./build.sh
 ```
-
-to install docker-bastion.
 
 # Usage
 You can run ```docker-bastion -h``` for help information.
@@ -50,6 +48,14 @@ GLOBAL OPTIONS:
    --version, -v    print the version
 
 ```
+
+When docker-bastion is started, open your browser and visit the
+```--manage-addr``` you specified or the default 1015 port of the server.
+
+You can create a user and assign some containers to the user, then the
+user can login to the container via
+```ssh username.container-id@your-ip -p 2222``` (change 2222 to your 
+```--ssh-addr```).
 
 # Roadmap
 1. [ ] replace ```docker exec``` with docker remote API, thus we can manage containers on other hosts.
