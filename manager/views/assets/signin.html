@@ -43,24 +43,8 @@
   </body>
 
   <script src="/jquery.min.js"></script>
+  <script src="/dashboard.js"></script>
   <script>
-    $(document).ready(function(){
-        $("#signinForm").submit(function(e) {
-          e.preventDefault();
-          var data = {
-            name: $('#inputUsername').val(),
-            password: $('#inputPassword').val()
-          };
-          $.ajax({
-            type: 'POST',
-            url: '/api/login', 
-            data: JSON.stringify(data),
-            contentType: 'application/json',
-            success: function(r) {
-              location.href = '/containers';
-            }
-          });
-        });
-    });
+    $(document).ready(bind_login_event);
   </script>
 </html>

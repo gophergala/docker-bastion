@@ -146,7 +146,8 @@ function revoke(id) {
     url: '/api/priv/'+id,
     success: function(r) {
       $('#priv_'+id).remove();
-    }
+    },
+    error: error_callback
   });
 }
 
@@ -156,7 +157,8 @@ function delete_user(id) {
     url: '/api/users/'+id,
     success: function(r) {
       $('#user_'+id).remove();
-    }
+    },
+    error: error_callback
   });
 }
 
@@ -179,6 +181,7 @@ function create_user() {
       window.location.reload();
     },
     contentType: 'application/json',
+    error: error_callback
   });
 }
 
@@ -202,6 +205,7 @@ function create_container() {
       window.location.reload();
     },
     contentType: 'application/json',
+    error: error_callback
   });
 }
 
@@ -220,6 +224,7 @@ function chpasswd() {
       $('#chpasswd_box').modal('hide');
     },
     contentType: 'application/json',
+    error: error_callback
   });
 }
 
@@ -278,8 +283,38 @@ function delete_container(cid) {
     url: '/api/containers/'+cid,
     success: function(r) {
       window.location.reload();
-    }
+    },
+    error: error_callback
   })
+}
+
+function error_callback(xhr) {
+  if (xhr.responseText.length > 0) {
+    var data = JSON.parse(xhr.responseText);
+    if (data.message) {
+      alert(data.message);
+    }
+  }
+}
+
+function bind_login_event() {
+  $("#signinForm").submit(function(e) {
+    e.preventDefault();
+    var data = {
+      name: $('#inputUsername').val(),
+      password: $('#inputPassword').val()
+    };
+    $.ajax({
+      type: 'POST',
+      url: '/api/login', 
+      data: JSON.stringify(data),
+      contentType: 'application/json',
+      success: function(r) {
+        location.href = '/containers';
+      },
+      error: error_callback
+    });
+  });
 }
 
 $(document).ready(function() {
