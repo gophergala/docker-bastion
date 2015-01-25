@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/go-martini/martini"
 	"github.com/mountkin/dockerclient"
 )
@@ -32,6 +33,11 @@ func New(addr string, db *sql.DB, ch chan<- error) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = mgr.addDefaultUser()
+	if err != nil {
+		return nil, err
+	}
+
 	return mgr, nil
 }
 
@@ -40,4 +46,23 @@ func (mgr *Manager) Start() {
 		mgr.m.RunOnAddr(mgr.addr)
 		mgr.errch <- nil
 	}()
+}
+
+func (mgr *Manager) addDefaultUser() error {
+	exists := 0
+	err := mgr.db.QueryRow("select count(*) from admins").Scan(&exists)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	if exists == 0 {
+		// add a default user, name: admin, password: password
+		_, err := mgr.db.Exec("insert into admins(name, password) values(?,?)", "admin", "$2a$11$6BDpJ3NbRgDruOqY15Nsy.7vx3a32p.JdQjy1NxOWoshKDaRflUti")
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		log.Info("A default user is created. username: admin, password: password")
+	}
+	return nil
 }
