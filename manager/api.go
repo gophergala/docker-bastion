@@ -14,7 +14,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/go-martini/martini"
 	"github.com/gophergala/docker-bastion/config"
-	//"github.com/gophergala/docker-bastion/manager/views"
+	"github.com/gophergala/docker-bastion/manager/views"
 	"github.com/martini-contrib/render"
 	"github.com/martini-contrib/sessions"
 	"github.com/mountkin/dockerclient"
@@ -116,8 +116,8 @@ func (mgr *Manager) authRequired(r *http.Request) bool {
 }
 
 func (mgr *Manager) registerRoutes() {
-	//view := views.New()
-	//mgr.m.NotFound(view.ServeHTTP)
+	view := views.New("signin.html")
+	mgr.m.NotFound(view.ServeHTTP)
 	mgr.m.Group(API_PREFIX, func(r martini.Router) {
 		r.Get("/_ping", func(w http.ResponseWriter) {
 			w.Write([]byte{'O', 'K'})
@@ -184,9 +184,22 @@ func (mgr *Manager) Logout(w http.ResponseWriter, r *http.Request, ss sessions.S
 }
 
 type User struct {
-	Id        int       `json:"id"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
+	Id        int       `json:"id,omitempty"`
+	Name      string    `json:"user_name"`
+	CreatedAt time.Time `json:"user_created_at"`
+}
+
+// User to Container privileges map
+type Priv struct {
+	PrivId   int       `json:"priv_id"`
+	Cid      string    `json:"cid"`
+	UserId   int       `json:"user_id"`
+	JoinedAt time.Time `json:"joined_at"`
+}
+
+type UserPriv struct {
+	User
+	Priv
 }
 
 // POST /api/users
@@ -221,8 +234,8 @@ func (mgr *Manager) AddUser(w http.ResponseWriter, r *http.Request, rnd render.R
 
 // GET /api/users
 func (mgr *Manager) Users(w http.ResponseWriter, rnd render.Render) {
-	ret := []User{}
-	rows, err := mgr.db.Query("select id, name, created_at from users order by id")
+	ret := []UserPriv{}
+	rows, err := mgr.db.Query("select users.id, users.name, users.created_at, containers.id priv_id, containers.cid, containers.created_at joined_at from users left join containers on users.id = containers.user_id order by users.id, containers.id")
 	if err != nil {
 		mgr.showError(err, w)
 		return
@@ -230,8 +243,8 @@ func (mgr *Manager) Users(w http.ResponseWriter, rnd render.Render) {
 	defer rows.Close()
 
 	for rows.Next() {
-		user := User{}
-		err = rows.Scan(&user.Id, &user.Name, &user.CreatedAt)
+		user := UserPriv{}
+		err = rows.Scan(&user.UserId, &user.Name, &user.CreatedAt, &user.PrivId, &user.Cid, &user.JoinedAt)
 		if err != nil {
 			continue
 		}

@@ -77,6 +77,7 @@ func initDB() (*sql.DB, error) {
 		)`,
 		`create index if not exists idx_name on users (name)`,
 		`create table if not exists containers (
+			id integer primary key,
 			cid character(12),
 			user_id integer,
 			created_at datetime default current_timestamp
