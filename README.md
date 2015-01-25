@@ -16,7 +16,11 @@ Check https://docs.docker.com/v1.3/installation/ for docker installation guide.
 
 When docker is ready, run
 
-```go get -u github.com/gophergala/docker-bastion```
+```bash
+git clone https://github.com/gophergala/docker-bastion.git
+cd docker-bastion
+./build.sh
+```
 
 to install docker-bastion.
 
