@@ -337,6 +337,12 @@ func (mgr *Manager) CreateContainer(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	cid, err := mgr.client.CreateContainer(cfg, params["name"])
+	if err == dockerclient.ErrNotFound {
+		err = mgr.client.PullImage(cfg.Image, nil)
+		if err == nil {
+			cid, err = mgr.client.CreateContainer(cfg, params["name"])
+		}
+	}
 	if err != nil {
 		log.Error("mgr.client.CreateContainer: ", err)
 		mgr.showError(err, w)
@@ -347,8 +353,8 @@ func (mgr *Manager) CreateContainer(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		mgr.client.StartContainer(cid, nil)
+		fmt.Fprintf(w, "{%q:%q}", "cid", cid)
 	}
-	fmt.Fprintf(w, "{%q:%q}", "cid", cid)
 }
 
 // DELETE /api/containers/:id
