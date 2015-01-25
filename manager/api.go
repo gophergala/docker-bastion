@@ -124,6 +124,7 @@ func (mgr *Manager) registerRoutes() {
 		})
 		r.Post("/login", mgr.Login)
 		r.Delete("/logout", mgr.Logout)
+		r.Post("/passwd", mgr.ChPasswd)
 		r.Post("/users", mgr.AddUser)
 		r.Get("/users", mgr.Users)
 		r.Delete("/users/:id", mgr.DeleteUser)
@@ -205,7 +206,7 @@ type UserPriv struct {
 // POST /api/users
 func (mgr *Manager) AddUser(w http.ResponseWriter, r *http.Request, rnd render.Render) {
 	req := make(map[string]string)
-	err := json.NewDecoder(r.Body).Decode(req)
+	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil || len(req["name"]) < 3 || len(req["password"]) < 3 {
 		w.WriteHeader(400)
 		return
@@ -294,12 +295,13 @@ func (mgr *Manager) Grant(w http.ResponseWriter, r *http.Request) {
 
 	// TODO: check existence of the user
 	container := r.Form["container"][0]
-	_, err = mgr.db.Exec("insert into containers (user_id, cid) values (?, ?)", uid, container)
+	result, err := mgr.db.Exec("insert into containers (user_id, cid) values (?, ?)", uid, container)
 	if err != nil {
 		mgr.showError(err, w)
 		return
 	}
-	w.WriteHeader(204)
+	id, _ := result.LastInsertId()
+	json.NewEncoder(w).Encode(map[string]int64{"id": id})
 }
 
 // DELETE /api/priv/:id
@@ -317,24 +319,22 @@ func (mgr *Manager) Revoke(w http.ResponseWriter, params martini.Params) {
 	}
 }
 
-// POST /api/containers?name=dev2&image=xxx&uid=123
+// POST /api/containers
 func (mgr *Manager) CreateContainer(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
 	params := make(map[string]string)
-	for _, k := range []string{"name", "image", "user_id"} {
-		if len(r.Form[k]) == 1 {
-			params[k] = r.Form[k][0]
-		} else {
-			w.WriteHeader(400)
-			fmt.Fprintf(w, "{%q:%q}", "message", k+" is required")
-			return
-		}
+	err := json.NewDecoder(r.Body).Decode(&params)
+	if err != nil || len(params["name"]) < 3 || len(params["image"]) < 3 {
+		w.WriteHeader(400)
+		return
 	}
+
 	cfg := &dockerclient.ContainerConfig{
 		Tty:   true,
 		Image: params["image"],
 		Cmd:   []string{"/bin/sh"},
-		// TODO: mount /root
+		HostConfig: dockerclient.HostConfig{
+			RestartPolicy: dockerclient.RestartPolicy{"always", 125},
+		},
 	}
 	cid, err := mgr.client.CreateContainer(cfg, params["name"])
 	if err != nil {
@@ -346,6 +346,7 @@ func (mgr *Manager) CreateContainer(w http.ResponseWriter, r *http.Request) {
 			mgr.showError(err, w)
 			return
 		}
+		mgr.client.StartContainer(cid, nil)
 	}
 	fmt.Fprintf(w, "{%q:%q}", "cid", cid)
 }
@@ -370,4 +371,28 @@ func (mgr *Manager) Containers(w http.ResponseWriter, rnd render.Render) {
 		return
 	}
 	rnd.JSON(200, containers)
+}
+
+// GET /api/containers
+func (mgr *Manager) ChPasswd(w http.ResponseWriter, r *http.Request, ss sessions.Session) {
+	params := make(map[string]string)
+	err := json.NewDecoder(r.Body).Decode(&params)
+	if err != nil || len(params["password"]) < 5 {
+		w.WriteHeader(400)
+		return
+	}
+
+	passwd, err := bcrypt.GenerateFromPassword([]byte(params["password"]), 11)
+	if err != nil {
+		mgr.showError(err, w)
+		return
+	}
+	uid := ss.Get("uid").(int)
+	_, err = mgr.db.Exec("update admins set password = ? where id = ?", passwd, uid)
+	if err != nil {
+		log.Error("ChPasswd: ", err)
+		mgr.showError(err, w)
+		return
+	}
+	w.WriteHeader(204)
 }

@@ -26,7 +26,7 @@ function dispatch() {
     '/containers': {
       title: 'Containers',
       action: load_containers,
-      nav: 'nav-containers'
+      nav: 'nav-containers',
     },
     '/users': {
       title: 'Users',
@@ -51,12 +51,14 @@ function dispatch() {
 
 function load_users() {
   $.get('/api/users', function(data) {
+    normalize_user_list(data);
     for (var i = 0; i < data.length; i++) {
       var tr = $('#'+data[i].cid);
       if (!tr) {
         continue
       }
-      tr.children('td.user').append(data[i].user_name+'<br />');
+      var user = data[i];
+      tr.children('td.user').append('<span id="priv_' + user.priv_id + '">' + user.user_name + '&nbsp;&nbsp;&nbsp;&nbsp;<a href="javascript:revoke(' + user.priv_id + ');">Revoke</a></span><br />');
     }
   }, 'json');
 }
@@ -73,9 +75,12 @@ function set_table_header(th) {
 function load_containers() {
   var th = ["ID", "Users", "Name", "Created At", "Image", "Status", "Action"];
   set_table_header(th);
+  $('#page-header').append('<button class="btn btn-success pull-right" type="button" data-toggle="modal" data-target="#create_container_box"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span> Create Container</button>');
   $.get('/api/containers', function(data) {
+    window.containers = {};
     var container = $('#main-table').find('tbody');
     for (var i = 0; i < data.length; i++) {
+      window.containers[data[i].Id] = data[i];
       var tr = $('<tr id="' + data[i].Id + '"></tr>');
       tr.append('<td>' + data[i].Id.substring(0, 12) + '</td>');
       tr.append('<td class="user"></td>');
@@ -83,31 +88,38 @@ function load_containers() {
       tr.append('<td>' + format_container_time(data[i].Created) + '</td>');
       tr.append('<td>' + data[i].Image + '</td>');
       tr.append('<td>' + data[i].Status + '</td>');
-      tr.append('<td><a href="#">Grant</a></td>');
+      tr.append('<td><a href="javascript:show_grant_box(\'' + data[i].Id +'\');">Grant</a></td>');
       container.append(tr);
     }
     load_users();
   }, 'json');
 }
 
+function normalize_user_list(data) {
+  var users = {};
+  for (var i = 0; i < data.length; i++) {
+    var user = data[i];
+    if (users[user.user_name]) {
+      users[user.user_name].containers.push({cid: user.cid, priv_id: user.priv_id});
+    } else {
+      users[user.user_name] = {
+        id: user.user_id,
+        name: user.user_name,
+        created_at: user.user_created_at,
+        containers: [{cid: user.cid, priv_id: user.priv_id}]
+      };
+    }
+  }
+  window.users = users;
+  return users;
+}
+
 function list_users() {
   var th = ["Name", "Containers", "Created At", "Action"];
   set_table_header(th);
+  $('#page-header').append('<button class="btn btn-success pull-right" type="button" data-toggle="modal" data-target="#create_user_box"><span class="glyphicon glyphicon-plus" aria-hidden="true"></span> Create User</button>');
   $.get('/api/users', function(data) {
-    var users = {};
-    for (var i = 0; i < data.length; i++) {
-      var user = data[i];
-      if (users[user.user_name]) {
-        users[user.user_name].containers.push({cid: user.cid, priv_id: user.priv_id});
-      } else {
-        users[user.user_name] = {
-          id: user.user_id,
-          name: user.user_name,
-          created_at: user.user_created_at,
-          containers: [{cid: user.cid, priv_id: user.priv_id}]
-        };
-      }
-    }
+    var users = normalize_user_list(data);
     var container = $('#main-table').find('tbody');
     for (var name in users) {
       var user = users[name];
@@ -144,6 +156,113 @@ function delete_user(id) {
     url: '/api/users/'+id,
     success: function(r) {
       $('#user_'+id).remove();
+    }
+  });
+}
+
+function create_user() {
+  var name = $('#user_name').val();
+  var pass = $('#user_password').val();
+  if (! /^[a-z0-9]+$/.test(name) || name.length < 3) {
+    alert('Username can only contain 0-9a-z and more than 3 characters.');
+    return;
+  }
+  if (pass.length < 6) {
+    alert("Password must be more than 6 characters.");
+    return;
+  }
+  $.ajax({
+    type: 'POST',
+    url: '/api/users',
+    data: JSON.stringify({name: name, password: pass}),
+    success: function() {
+      window.location.reload();
+    },
+    contentType: 'application/json',
+  });
+}
+
+function create_container() {
+  var name = $('#container_name_input').val();
+  var image = $('#image_input').val();
+  if (! /^[a-z0-9]+$/.test(name) || name.length < 3) {
+    alert('Username can only contain 0-9a-z and more than 2 characters.');
+    return;
+  }
+  if (image.length < 3) {
+    alert('Please select an image');
+    return;
+  }
+  $.ajax({
+    type: 'POST',
+    url: '/api/containers',
+    data: JSON.stringify({name: name, image: image}),
+    success: function() {
+      window.location.reload();
+    },
+    contentType: 'application/json',
+  });
+}
+
+function chpasswd() {
+  var pass = $('#new_password').val();
+  if (pass.length < 6) {
+    alert("Password must be more than 6 characters.");
+    return;
+  }
+  $.ajax({
+    type: 'POST',
+    url: '/api/passwd',
+    data: JSON.stringify({password: pass}),
+    success: function() {
+      alert('Your password has be modifed.');
+      $('#chpasswd_box').modal('hide');
+    },
+    contentType: 'application/json',
+  });
+}
+
+function show_help() {
+}
+
+function show_grant_box(id) {
+  $('#grant_box').modal('show');
+  var names = window.containers[id].Names;
+  if (names.length == 0 ) {
+    names.push(window.containers[id].Id.substring(0, 12));
+  } else {
+    names[0] = names[0].substring(1);
+  }
+  var html = 'Grant access privilege to user for ' + '<span class="label label-info">' + names[0] + '</span>';
+  $('#grant_box').find('.modal-title').html(html);
+  $('#grant_btn').attr('cid', id);
+  $('#select_user_name').empty();
+  for (var name in window.users) {
+    $('#select_user_name').append('<option value="' + window.users[name].id + '">' + name + '</option>');
+  }
+}
+
+function grant() {
+  var cid = $('#grant_btn').attr('cid');
+  var uid = $('#select_user_name').val();
+  var user;
+  for (var i in window.users) {
+    if (window.users[i].id + '' == uid + '') {
+      user = window.users[i];
+    }
+  }
+  $.post('/api/priv', {user_id: uid, container: cid}, function(r) {
+    $('#'+cid).children('td.user').append('<span id="priv_' + r.id + '">' + user.name + '&nbsp;&nbsp;&nbsp;&nbsp;<a href="javascript:revoke(' + r.id + ');">Revoke</a></span><br />');
+    $('#grant_box').modal('hide');
+  }, 'json')
+}
+
+function logout() {
+  $.ajax({
+    type: 'DELETE',
+    url: '/api/logout',
+    success: function(r) {
+      location.href = '/';
     }
   });
 }
