@@ -2,6 +2,7 @@ package manager
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -46,6 +47,7 @@ func (mgr *Manager) Start() {
 		mgr.m.RunOnAddr(mgr.addr)
 		mgr.errch <- nil
 	}()
+	go mgr.refreshContainers()
 }
 
 func (mgr *Manager) addDefaultUser() error {
@@ -65,4 +67,24 @@ func (mgr *Manager) addDefaultUser() error {
 		log.Info("A default user is created. username: admin, password: password")
 	}
 	return nil
+}
+
+func (mgr *Manager) refreshContainers() {
+	for _ = range time.Tick(30 * time.Second) {
+		containers, err := mgr.client.ListContainers(true, false, "")
+		if err != nil {
+			continue
+		}
+		ids := make([]string, len(containers))
+		for i, c := range containers {
+			ids[i] = c.Id
+		}
+		if len(ids) == 0 {
+			mgr.db.Exec("delete from containers")
+			continue
+		}
+		in := "('" + strings.Join(ids, "','") + "')"
+		sql := "delete from containers where cid not in " + in
+		mgr.db.Exec(sql)
+	}
 }
