@@ -185,14 +185,15 @@ function create_user() {
 function create_container() {
   var name = $('#container_name_input').val();
   var image = $('#image_input').val();
-  if (! /^[a-z0-9]+$/.test(name) || name.length < 3) {
-    alert('Username can only contain 0-9a-z and more than 2 characters.');
+  if (! /^[a-z0-9-_]+$/.test(name) || name.length < 3) {
+    alert('Username can only contain 0-9a-z-_ and more than 2 characters.');
     return;
   }
   if (image.length < 3) {
     alert('Please select an image');
     return;
   }
+  var btn = $('#btn-create-container').button('loading');
   $.ajax({
     type: 'POST',
     url: '/api/containers',
