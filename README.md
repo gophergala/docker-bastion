@@ -54,8 +54,8 @@ When docker-bastion is started, open your browser and visit the
 
 You can create a user and assign some containers to the user, then the
 user can login to the container via
-```ssh username.container-id@your-ip -p 2222``` (change 2222 to your 
-```--ssh-addr```).
+```ssh username.container-id@your-ip -p 2222``` (remeber to change 2222
+to your ```--ssh-addr```).
 
 # Roadmap
 1. [ ] replace ```docker exec``` with docker remote API, thus we can manage containers on other hosts.
