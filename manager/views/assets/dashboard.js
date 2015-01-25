@@ -88,7 +88,7 @@ function load_containers() {
       tr.append('<td>' + format_container_time(data[i].Created) + '</td>');
       tr.append('<td>' + data[i].Image + '</td>');
       tr.append('<td>' + data[i].Status + '</td>');
-      tr.append('<td><a href="javascript:show_grant_box(\'' + data[i].Id +'\');">Grant</a></td>');
+      tr.append('<td><a href="javascript:show_grant_box(\'' + data[i].Id +'\');">Grant</a> | <a href="javascript:delete_container(\''+data[i].Id+'\');"><span class="label label-danger">Delete</span></a></td>');
       container.append(tr);
     }
     load_users();
@@ -266,6 +266,20 @@ function logout() {
       location.href = '/';
     }
   });
+}
+
+function delete_container(cid) {
+  if (!window.confirm('Are you sure to delete container '+cid)) {
+    return;
+  }
+
+  $.ajax({
+    type: 'DELETE',
+    url: '/api/containers/'+cid,
+    success: function(r) {
+      window.location.reload();
+    }
+  })
 }
 
 $(document).ready(function() {

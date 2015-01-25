@@ -131,7 +131,7 @@ func (mgr *Manager) registerRoutes() {
 		r.Post("/priv", mgr.Grant)
 		r.Delete("/priv/:id", mgr.Revoke)
 		r.Post("/containers", mgr.CreateContainer)
-		r.Delete("/containers/:name", mgr.DeleteContainer)
+		r.Delete("/containers/:id", mgr.DeleteContainer)
 		r.Get("/containers", mgr.Containers)
 	})
 }
@@ -361,6 +361,7 @@ func (mgr *Manager) CreateContainer(w http.ResponseWriter, r *http.Request) {
 func (mgr *Manager) DeleteContainer(w http.ResponseWriter, r *http.Request, params martini.Params, rnd render.Render) {
 	err := mgr.client.RemoveContainer(params["id"], true)
 	if err == nil {
+		mgr.db.Exec("delete from containers where cid = ?", params["id"])
 		w.WriteHeader(204)
 	} else {
 		log.Error(err)
