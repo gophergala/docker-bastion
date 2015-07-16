@@ -22,6 +22,9 @@ func New(fallback string) *Views {
 }
 
 func (v *Views) ServeHTTP(w http.ResponseWriter, r *http.Request, ss sessions.Session) {
-	v.Rewrite(r, ss)
+	if v.Rewrite(w, r, ss) {
+		// redirected
+		return
+	}
 	v.s.ServeHTTP(w, r)
 }

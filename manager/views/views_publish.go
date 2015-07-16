@@ -29,7 +29,10 @@ func New(fallback string) *Views {
 }
 
 func (v *Views) ServeHTTP(w http.ResponseWriter, r *http.Request, ss sessions.Session) {
-	v.Rewrite(r, ss)
+	if v.Rewrite(w, r, ss) {
+		// redirected
+		return
+	}
 	var ok bool
 	name := r.URL.Path[1:]
 	if _, ok = v.Names[name]; !ok {

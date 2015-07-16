@@ -12,16 +12,18 @@ var rewriteMap = map[string]string{
 	"/users":      "/dashboard.html",
 }
 
-func (v *Views) Rewrite(r *http.Request, ss sessions.Session) {
+func (v *Views) Rewrite(w http.ResponseWriter, r *http.Request, ss sessions.Session) bool {
 	if r.URL.Path == "/" {
 		if ss.Get("uid") == nil {
 			r.URL.Path = "/" + v.Index
 		} else {
-			r.URL.Path = "/containers"
+			http.Redirect(w, r, "/containers", 302)
+			return true
 		}
 	}
 
 	if t, ok := rewriteMap[r.URL.Path]; ok {
 		r.URL.Path = t
 	}
+	return false
 }
